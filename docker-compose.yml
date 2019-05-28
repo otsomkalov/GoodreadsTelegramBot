@@ -1,0 +1,8 @@
+version: '3.4'
+
+services:
+  goodreadstelegrambot:
+    image: ${DOCKER_REGISTRY-}goodreadstelegrambot
+    build:
+      context: .
+      dockerfile: GoodreadsTelegramBot/Dockerfile
