@@ -2,9 +2,8 @@
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Goodreads;
-using Goodreads.Models.Request;
-using Goodreads.Models.Response;
+using GoodreadsTelegramBot.Models;
+using RestSharp;
 using Telegram.Bot;
 using Telegram.Bot.Args;
 using Telegram.Bot.Types;
@@ -17,19 +16,22 @@ namespace GoodreadsTelegramBot
     internal static class Program
     {
         private static TelegramBotClient _bot;
-        private static IGoodreadsClient _goodreadsClient;
+        private static IRestClient _restClient;
 
         private static async Task Main(string[] args)
         {
-            if (args.Length != 3)
+            if (args.Length != 2)
             {
-                Console.WriteLine("You need to supply bot token and API code & secret");
+                Console.WriteLine("You need to supply bot token and API code");
 
                 return;
             }
 
             _bot = new TelegramBotClient(args[0]);
-            _goodreadsClient = GoodreadsClient.Create(args[1], args[2]);
+
+            _restClient = new RestClient("https://www.goodreads.com/search/index.xml")
+                .AddDefaultQueryParameter("key", args[1])
+                .AddDefaultQueryParameter("search", "title");
 
             _bot.OnInlineQuery += OnInlineQueryAsync;
             _bot.OnMessage += OnMessageAsync;
@@ -65,19 +67,22 @@ namespace GoodreadsTelegramBot
 
             if (string.IsNullOrWhiteSpace(inlineQuery.Query)) return;
 
-            var books = await _goodreadsClient.Books.Search(inlineQuery.Query, 1, BookSearchField.Title);
+            var searchRequest = new RestRequest()
+                .AddQueryParameter("q", inlineQuery.Query);
 
-            var response = books.List.Select(book =>
+            var searchResponse = await _restClient.ExecuteTaskAsync<GoodreadsResponse>(searchRequest);
+
+            var response = searchResponse.Data.Search.Results.Select(work =>
             {
                 var resultArticle =
-                    new InlineQueryResultArticle(book.Id.ToString(), book.BestBook.Title,
-                        new InputTextMessageContent(GetMarkdown(book))
+                    new InlineQueryResultArticle(work.BestBook.Id.ToString(), work.BestBook.Title,
+                        new InputTextMessageContent(GetMarkdown(work))
                         {
                             ParseMode = ParseMode.Html
                         })
                     {
-                        ThumbUrl = book.BestBook.ImageUrl,
-                        Description = book.BestBook.AuthorName
+                        ThumbUrl = work.BestBook.ImageUrl,
+                        Description = work.BestBook.Author.Name
                     };
 
                 return resultArticle;
@@ -91,8 +96,9 @@ namespace GoodreadsTelegramBot
             return new StringBuilder()
                 .AppendLine(
                     $"<a href=\"https://www.goodreads.com/book/show/{book.BestBook.Id}\">{book.BestBook.Title}</a>")
-                .AppendLine($"Author: {book.BestBook.AuthorName}")
-                .AppendLine($"Rating: {new string('⭐', Convert.ToInt32(book.RatingsSum))}")
+                .AppendLine(
+                    $"Author: <a href=\"https://www.goodreads.com/author/show/{book.BestBook.Author.Id}\">{book.BestBook.Author.Name}</a>")
+                .AppendLine($"Rating: {new string('⭐', Convert.ToInt32(book.AverageRating))}")
                 .ToString();
         }
     }

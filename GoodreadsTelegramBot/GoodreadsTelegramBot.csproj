@@ -10,7 +10,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="Goodreads" Version="1.0.1" />
+      <PackageReference Include="RestSharp" Version="106.6.10" />
       <PackageReference Include="Telegram.Bot" Version="15.0.0" />
     </ItemGroup>
 
