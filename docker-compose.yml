@@ -7,4 +7,4 @@ services:
       context: .
       dockerfile: GoodreadsTelegramBot/Dockerfile
     volumes:
-      - /var/log:/app/log/bots
+      - /var/log/bots:/app/log
