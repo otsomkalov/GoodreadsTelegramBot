@@ -5,7 +5,7 @@ Telegram Bot to explore [Goodreads](https://www.goodreads.com/).
 ## Getting Started
 ### Prerequisites
 
-- [.NET Core 2.2](https://dotnet.microsoft.com/download) or higher
+- [.NET Core 3.0](https://dotnet.microsoft.com/download) or higher
 
 ### Installing
 
@@ -23,8 +23,7 @@ Telegram Bot to explore [Goodreads](https://www.goodreads.com/).
 1. Clone project
 2. Run in folder
 ```
-docker-compose build
-docker run -d goodreadstelegrambot <telegram_bot_token> <goodreads_key> <goodreads_secret>
+docker-compose run -d goodreadstelegrambot <telegram_bot_token> <goodreads_key> <goodreads_secret>
 ```
 or go to **GoodreadsTelegramBot** folder and run:
 ```

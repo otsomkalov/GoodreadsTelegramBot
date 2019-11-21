@@ -1,15 +1,13 @@
 ﻿using System;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
+using GoodreadsTelegramBot.Helpers;
 using GoodreadsTelegramBot.Models;
 using RestSharp;
+using Serilog;
 using Telegram.Bot;
 using Telegram.Bot.Args;
 using Telegram.Bot.Types;
-using Telegram.Bot.Types.Enums;
-using Telegram.Bot.Types.InlineQueryResults;
-using Telegram.Bot.Types.ReplyMarkups;
 
 namespace GoodreadsTelegramBot
 {
@@ -17,6 +15,7 @@ namespace GoodreadsTelegramBot
     {
         private static TelegramBotClient _bot;
         private static IRestClient _restClient;
+        private static ILogger _logger;
 
         private static async Task Main(string[] args)
         {
@@ -26,6 +25,8 @@ namespace GoodreadsTelegramBot
 
                 return;
             }
+
+            _logger = Configuration.ConfigureLogger();
 
             _bot = new TelegramBotClient(args[0]);
 
@@ -38,27 +39,29 @@ namespace GoodreadsTelegramBot
 
             _bot.StartReceiving();
 
-            Console.WriteLine("Bot started!");
+            _logger.Information("Bot started!");
 
-            while (true)
-            {
-                await Task.Delay(int.MaxValue);
-            }
+            await Task.Delay(-1);
         }
 
         private static async void OnMessageAsync(object sender, MessageEventArgs messageEventArgs)
         {
-            var message = messageEventArgs.Message;
+            try
+            {
+                var message = messageEventArgs.Message;
 
-            if (message.Text.StartsWith("/start"))
-                await _bot.SendTextMessageAsync(new ChatId(message.From.Id),
-                    "This bot allows you search & share books from Goodreads. It works on every dialog, " +
-                    "just type @GoodreadsBooksBot in message input",
-                    replyMarkup: new InlineKeyboardMarkup(new[]
-                    {
-                        InlineKeyboardButton.WithSwitchInlineQueryCurrentChat("🔍 Search books"),
-                        InlineKeyboardButton.WithSwitchInlineQuery("🔗 Find & share book")
-                    }));
+                _logger.Information("Got message: {@Message}", message);
+
+                if (message.Text.StartsWith("/start"))
+                    await _bot.SendTextMessageAsync(new ChatId(message.From.Id),
+                        "This bot allows you search & share books from Goodreads. It works on every dialog, " +
+                        "just type @GoodreadsBooksBot in message input",
+                        replyMarkup: InlineKeyboardHelpers.GetStartInlineKeyboardMarkup());
+            }
+            catch (Exception e)
+            {
+                _logger.Error(e, "Error during processing message");
+            }
         }
 
         private static async void OnInlineQueryAsync(object sender, InlineQueryEventArgs inlineQueryEventArgs)
@@ -72,34 +75,11 @@ namespace GoodreadsTelegramBot
 
             var searchResponse = await _restClient.ExecuteTaskAsync<GoodreadsResponse>(searchRequest);
 
-            var response = searchResponse.Data.Search.Results.Select(work =>
-            {
-                var resultArticle =
-                    new InlineQueryResultArticle(work.BestBook.Id.ToString(), work.BestBook.Title,
-                        new InputTextMessageContent(GetMarkdown(work))
-                        {
-                            ParseMode = ParseMode.Html
-                        })
-                    {
-                        ThumbUrl = work.BestBook.ImageUrl,
-                        Description = work.BestBook.Author.Name
-                    };
-
-                return resultArticle;
-            });
+            var response =
+                searchResponse.Data.Search.Results.Select(InlineQueryResultArticleHelpers
+                    .GetInlineQueryResultArticleForWork);
 
             await _bot.AnswerInlineQueryAsync(inlineQuery.Id, response);
-        }
-
-        private static string GetMarkdown(Work book)
-        {
-            return new StringBuilder()
-                .AppendLine(
-                    $"<a href=\"https://www.goodreads.com/book/show/{book.BestBook.Id}\">{book.BestBook.Title}</a>")
-                .AppendLine(
-                    $"Author: <a href=\"https://www.goodreads.com/author/show/{book.BestBook.Author.Id}\">{book.BestBook.Author.Name}</a>")
-                .AppendLine($"Rating: {new string('⭐', Convert.ToInt32(book.AverageRating))}")
-                .ToString();
         }
     }
 }
